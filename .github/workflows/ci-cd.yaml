@@ -173,6 +173,20 @@ jobs:
           echo "Checking if namespace exists..."
           kubectl --kubeconfig=kubeconfig.yaml get namespace ${{ env.NAMESPACE }} || kubectl --kubeconfig=kubeconfig.yaml create namespace ${{ env.NAMESPACE }}
 
+          # Tạo hoặc cập nhật DockerHub secret để tránh lỗi ImagePullBackOff
+          echo "Tạo Docker registry secret..."
+          kubectl --kubeconfig=kubeconfig.yaml create secret docker-registry dockerhub-secret \
+            --docker-server=https://index.docker.io/v1/ \
+            --docker-username=${{ secrets.DOCKERHUB_USERNAME }} \
+            --docker-password=${{ secrets.DOCKERHUB_TOKEN }} \
+            --docker-email=your-email@example.com \
+            -n ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl --kubeconfig=kubeconfig.yaml apply -f -
+
+          # Đảm bảo deployment sử dụng secret này
+          echo "Patch deployment để sử dụng imagePullSecrets..."
+          kubectl --kubeconfig=kubeconfig.yaml patch deployment nestjs-app -n ${{ env.NAMESPACE }} --type=json \
+            -p='[{"op": "add", "path": "/spec/template/spec/imagePullSecrets", "value": [{"name": "dockerhub-secret"}]}]' || true
+
           echo "Checking if deployment exists..."
           if kubectl --kubeconfig=kubeconfig.yaml get deployment nestjs-app -n ${{ env.NAMESPACE }} 2>/dev/null; then
             echo "Updating existing deployment..."
@@ -183,8 +197,57 @@ jobs:
             kubectl --kubeconfig=kubeconfig.yaml apply -k kubernetes/overlays/${{ env.BRANCH_NAME }} -n ${{ env.NAMESPACE }}
           fi
 
-          echo "Checking deployment rollout status..."
-          kubectl --kubeconfig=kubeconfig.yaml rollout status deployment/nestjs-app -n ${{ env.NAMESPACE }} --timeout=120s
+          # Thêm thời gian ngắn để bắt đầu quá trình rollout
+          echo "Chờ khởi tạo pod mới..."
+          sleep 10
+
+          # Kiểm tra sự kiện trong namespace để tìm lỗi
+          echo "Events trong namespace:"
+          kubectl --kubeconfig=kubeconfig.yaml get events -n ${{ env.NAMESPACE }} --sort-by='.lastTimestamp'
+
+          # Kiểm tra trạng thái của các pods
+          echo "Chi tiết pods:"
+          kubectl --kubeconfig=kubeconfig.yaml get pods -n ${{ env.NAMESPACE }} -o wide
+
+          # Kiểm tra chi tiết về deployment để xem rollout strategy
+          echo "Chi tiết về Deployment:"
+          kubectl --kubeconfig=kubeconfig.yaml describe deployment nestjs-app -n ${{ env.NAMESPACE }}
+
+          # Kiểm tra các pods đang trong quá trình tạo hoặc terminate
+          echo "Pods đang có vấn đề:"
+          PODS=$(kubectl --kubeconfig=kubeconfig.yaml get pods -n ${{ env.NAMESPACE }} -l app=nestjs-app -o jsonpath='{.items[*].metadata.name}')
+          for POD in $PODS; do
+            echo "* Thông tin chi tiết về pod $POD:"
+            kubectl --kubeconfig=kubeconfig.yaml describe pod $POD -n ${{ env.NAMESPACE }}
+            echo "* Logs của pod $POD:"
+            kubectl --kubeconfig=kubeconfig.yaml logs $POD -n ${{ env.NAMESPACE }} || echo "Không thể lấy logs"
+          done
+
+          echo "Checking deployment rollout status with increased timeout..."
+          kubectl --kubeconfig=kubeconfig.yaml rollout status deployment/nestjs-app -n ${{ env.NAMESPACE }} --timeout=60s || {
+            echo "Rollout không hoàn tất trong thời gian chờ. Cố gắng giải quyết vấn đề..."
+
+            # Kiểm tra xem có pods nào bị kẹt trong trạng thái chờ xóa không
+            TERMINATING_PODS=$(kubectl --kubeconfig=kubeconfig.yaml get pods -n ${{ env.NAMESPACE }} -l app=nestjs-app --field-selector status.phase=Running -o jsonpath='{.items[*].metadata.deletionTimestamp}')
+            if [ -n "$TERMINATING_PODS" ]; then
+              echo "Có pods đang bị kẹt trong trạng thái Terminating. Xóa force..."
+              for POD in $PODS; do
+                kubectl --kubeconfig=kubeconfig.yaml delete pod $POD -n ${{ env.NAMESPACE }} --force --grace-period=0 || true
+              done
+            fi
+
+            # Thử restart deployment
+            echo "Force restart deployment để tạo pods mới..."
+            kubectl --kubeconfig=kubeconfig.yaml rollout restart deployment/nestjs-app -n ${{ env.NAMESPACE }}
+
+            # Thêm thời gian để bắt đầu quá trình rollout mới
+            echo "Chờ khởi tạo lại pod..."
+            sleep 15
+
+            # Kiểm tra lại trạng thái
+            echo "Trạng thái pods sau khi restart:"
+            kubectl --kubeconfig=kubeconfig.yaml get pods -n ${{ env.NAMESPACE }} -l app=nestjs-app
+          }
 
           echo "Deployment information:"
           kubectl --kubeconfig=kubeconfig.yaml get deployment nestjs-app -n ${{ env.NAMESPACE }} -o wide
