@@ -2,20 +2,28 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Set environment variables
-ENV NODE_ENV=production
+# Install build essentials
+RUN apk add --no-cache python3 make g++
 
 # Copy package files first for better caching
 COPY package.json package-lock.json* ./
 
-# Install dependencies with npm
-RUN npm ci --loglevel verbose || npm install --legacy-peer-deps --loglevel verbose
+# Install ALL dependencies including dev dependencies
+# We're in the build stage so we need everything
+RUN npm install --loglevel verbose --legacy-peer-deps
 
 # Copy the rest of the code
 COPY . .
 
-# Build the application using npx to find the local nest binary
-RUN npx nest build
+# Show directory content for debugging
+RUN ls -la && \
+  echo "Node modules:" && \
+  ls -la node_modules/.bin/
+
+# Try to build with verbose logging
+RUN NODE_ENV=development npx --verbose nest build --webpack --webpackPath webpack-hmr.config.js || \
+  NODE_ENV=development npx --verbose nest build || \
+  npm run build -- --verbose
 
 # Stage 2: Run app
 FROM node:18-alpine
