@@ -145,18 +145,18 @@ jobs:
 
           echo "Connecting to ArgoCD server: $ARGOCD_SERVER"
 
-          # Thêm port 443 (HTTPS) và tăng timeout
+          # Thử kết nối HTTPS (port 443)
           echo "Trying HTTPS connection with port 443..."
-          argocd login $ARGOCD_SERVER:443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / --timeout 60 && {
+          argocd login $ARGOCD_SERVER:443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / && {
             echo "Login successful via HTTPS (port 443)";
             echo "ARGOCD_SERVER=$ARGOCD_SERVER:443" >> $GITHUB_ENV;
             ARGOCD_LOGIN_SUCCESS=true;
           } || {
             echo "Failed to connect via HTTPS (port 443)";
 
-            # Thử kết nối với port 80 (HTTP)
+            # Thử kết nối HTTP (port 80)
             echo "Trying HTTP connection with port 80...";
-            argocd login $ARGOCD_SERVER:80 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / --timeout 60 && {
+            argocd login $ARGOCD_SERVER:80 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / && {
               echo "Login successful via HTTP (port 80)";
               echo "ARGOCD_SERVER=$ARGOCD_SERVER:80" >> $GITHUB_ENV;
               ARGOCD_LOGIN_SUCCESS=true;
@@ -165,7 +165,7 @@ jobs:
 
               # Thử không chỉ định cổng
               echo "Trying connection without port specification...";
-              argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / --timeout 60 || {
+              argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / || {
                 echo "ArgoCD login failed. Please verify server, username, and password.";
                 echo "ArgoCD Server (after format): $ARGOCD_SERVER";
                 exit 1;
@@ -175,7 +175,7 @@ jobs:
 
       - name: Sync ArgoCD Application
         run: |
-          argocd app sync ${{ env.APP_NAME }} --prune --timeout 120 || {
+          argocd app sync ${{ env.APP_NAME }} --prune || {
             echo "Failed to sync application: ${{ env.APP_NAME }}";
             echo "Checking application status:";
             argocd app get ${{ env.APP_NAME }};

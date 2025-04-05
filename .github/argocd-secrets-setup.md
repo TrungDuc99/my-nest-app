@@ -25,10 +25,16 @@ File này chỉ là hướng dẫn và **KHÔNG** chứa thông tin xác thực 
 
 Nếu bạn gặp lỗi "context deadline exceeded", có thể do một số nguyên nhân sau:
 
-1. **Cổng truy cập ArgoCD không phải 443 hoặc 80**: Trong trường hợp này, bạn cần cập nhật workflow để sử dụng cổng chính xác
+1. **Cổng truy cập ArgoCD không phải 443 hoặc 80**: Workflow hiện tại thử kết nối qua cả cổng 443, 80 và không chỉ định cổng
 2. **Firewall hoặc giới hạn mạng**: Đảm bảo rằng GitHub Actions runners (IP động) có thể truy cập đến ArgoCD server
 3. **ArgoCD server không phản hồi**: Kiểm tra trạng thái của ArgoCD server và đảm bảo nó đang chạy
-4. **ArgoCD URL Path sai**: Nếu ArgoCD chạy dưới một path khác (ví dụ: /argocd), hãy cập nhật tham số `--grpc-web-root-path`
+4. **ArgoCD URL Path sai**: Workflow thử với tham số `--grpc-web-root-path /` để hỗ trợ các cài đặt khác nhau
+
+## Các lỗi phổ biến và cách khắc phục
+
+- **"unknown flag: --timeout"**: Một số phiên bản ArgoCD CLI không hỗ trợ tham số --timeout. Đã cập nhật workflow để loại bỏ tham số này.
+- **"dial tcp: lookup tcp"**: Lỗi này xảy ra khi có vấn đề với định dạng URL. Đã cập nhật xử lý URL để đảm bảo đúng định dạng.
+- **"context deadline exceeded"**: Đã thêm nhiều phương thức kết nối thay thế để giải quyết vấn đề timeout.
 
 ## Cách thiết lập GitHub Secrets
 
