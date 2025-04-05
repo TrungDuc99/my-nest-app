@@ -15,7 +15,7 @@ COPY package.json pnpm-lock.yaml* ./
 
 # Install dependencies with more verbose output
 RUN pnpm config set auto-install-peers true && \
-  pnpm install --frozen-lockfile --no-strict-peer-dependencies --loglevel verbose
+  pnpm install --force --frozen-lockfile --no-strict-peer-dependencies --loglevel verbose
 
 # Copy the rest of the code
 COPY . .
@@ -43,7 +43,7 @@ COPY --from=builder /app/environments ./environments
 
 # Install production dependencies only
 RUN pnpm config set auto-install-peers true && \
-  pnpm install --prod --frozen-lockfile --no-strict-peer-dependencies --loglevel verbose
+  pnpm install --force --prod --frozen-lockfile --no-strict-peer-dependencies --loglevel verbose
 
 EXPOSE 3000
 
