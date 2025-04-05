@@ -50,6 +50,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+          ecr: false
+          logout: true
 
       - name: Extract branch name
         shell: bash
