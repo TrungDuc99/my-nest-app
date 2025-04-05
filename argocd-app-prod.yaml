@@ -6,13 +6,15 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/ducdt1999/my-nestjs-app.git
-    targetRevision: master
+    repoURL: https://github.com/YourUsername/my-nest-app.git
+    targetRevision: production
     path: kubernetes/overlays/prod
   destination:
     server: https://kubernetes.default.svc
-    namespace: nestjs-app
+    namespace: nestjs-app-prod
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

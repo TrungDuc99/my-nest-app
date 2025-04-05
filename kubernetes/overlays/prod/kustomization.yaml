@@ -1,14 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: nestjs-app-prod
+
 resources:
   - ../../base
 
-namespace: nestjs-app
+patches:
+  - path: patches/deployment-patch.yaml
 
-patchesStrategicMerge:
-  - deployment-patch.yaml
+configMapGenerator:
+  - name: nestjs-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - SWAGGER_ENABLED=false
 
-images:
-  - name: ducdt1999/nestjs-app
-    newTag: v2
+replicas:
+  - name: nestjs-app
+    count: 3
