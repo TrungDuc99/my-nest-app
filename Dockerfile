@@ -14,7 +14,7 @@ ARG NODE_ENV=production
 COPY . .
 RUN npm install -g pnpm && \
   pnpm config set auto-install-peers true && \
-  pnpm install --frozen-lockfile && \
+  pnpm install --frozen-lockfile --no-strict-peer-dependencies && \
   pnpm build
 
 # Stage 2: Run app
@@ -36,7 +36,7 @@ COPY --from=builder /app/environments ./environments
 
 RUN npm install -g pnpm && \
   pnpm config set auto-install-peers true && \
-  pnpm install --prod --frozen-lockfile
+  pnpm install --prod --frozen-lockfile --no-strict-peer-dependencies
 
 EXPOSE 3000
 
