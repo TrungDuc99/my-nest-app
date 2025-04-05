@@ -123,18 +123,41 @@ jobs:
           ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
           echo "Testing connection to ArgoCD server: $ARGOCD_SERVER"
 
-          # Kiểm tra kết nối đến port 443 (HTTPS)
+          # Kiểm tra kết nối đến port 443 (HTTPS) với timeout dài hơn
           echo "Testing HTTPS connection (port 443)..."
-          nc -zv $ARGOCD_SERVER 443 -w 10 || echo "Cannot connect to port 443"
+          nc -zv $ARGOCD_SERVER 443 -w 20 || echo "Cannot connect to port 443"
 
-          # Kiểm tra kết nối đến port 80 (HTTP)
+          # Kiểm tra kết nối đến port 80 (HTTP) với timeout dài hơn
           echo "Testing HTTP connection (port 80)..."
-          nc -zv $ARGOCD_SERVER 80 -w 10 || echo "Cannot connect to port 80"
+          nc -zv $ARGOCD_SERVER 80 -w 20 || echo "Cannot connect to port 80"
 
-          # Kiểm tra ArgoCD API endpoint trên cả hai cổng
-          echo "Testing ArgoCD API endpoints..."
-          curl -k https://$ARGOCD_SERVER/api/version -m 10 || echo "Cannot connect to HTTPS API"
-          curl http://$ARGOCD_SERVER/api/version -m 10 || echo "Cannot connect to HTTP API"
+          # Kiểm tra kết nối đến các cổng khác mà ArgoCD có thể lắng nghe
+          echo "Testing alternative ports (8080, 8443)..."
+          nc -zv $ARGOCD_SERVER 8080 -w 15 || echo "Cannot connect to port 8080"
+          nc -zv $ARGOCD_SERVER 8443 -w 15 || echo "Cannot connect to port 8443"
+
+          # Kiểm tra ArgoCD API endpoint với các tùy chọn curl nâng cao
+          echo "Testing ArgoCD API endpoints with extended options..."
+          curl -k -v --connect-timeout 30 https://$ARGOCD_SERVER/api/version || echo "Cannot connect to HTTPS API"
+          curl -v --connect-timeout 30 http://$ARGOCD_SERVER/api/version || echo "Cannot connect to HTTP API"
+
+      - name: Verify ArgoCD Server Accessibility
+        run: |
+          ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
+          # Xóa protocol và trailing slashes
+          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
+
+          # Thử ping đến server để kiểm tra kết nối mạng cơ bản
+          echo "Ping test to ArgoCD server..."
+          ping -c 3 $ARGOCD_SERVER || echo "Ping failed but might be blocked by firewall"
+
+          # Kiểm tra thông tin về tuyến đường mạng
+          echo "Network route information..."
+          traceroute $ARGOCD_SERVER || echo "Traceroute failed or not available"
+
+          # Hiển thị thông tin DNS
+          echo "DNS lookup information..."
+          nslookup $ARGOCD_SERVER || echo "DNS lookup failed"
 
       - name: Login to ArgoCD
         run: |
@@ -145,30 +168,45 @@ jobs:
 
           echo "Connecting to ArgoCD server: $ARGOCD_SERVER"
 
-          # Thử kết nối HTTPS (port 443)
-          echo "Trying HTTPS connection with port 443..."
-          argocd login $ARGOCD_SERVER:443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / && {
-            echo "Login successful via HTTPS (port 443)";
+          # Bước 1: Thử kết nối HTTPS với plaintext và insecure
+          echo "Trying HTTPS connection (443) with plaintext and insecure flags..."
+          argocd login $ARGOCD_SERVER:443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --plaintext && {
+            echo "Login successful via HTTPS (443) with plaintext";
             echo "ARGOCD_SERVER=$ARGOCD_SERVER:443" >> $GITHUB_ENV;
             ARGOCD_LOGIN_SUCCESS=true;
           } || {
-            echo "Failed to connect via HTTPS (port 443)";
+            echo "Failed with plaintext and insecure flags";
 
-            # Thử kết nối HTTP (port 80)
-            echo "Trying HTTP connection with port 80...";
-            argocd login $ARGOCD_SERVER:80 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / && {
-              echo "Login successful via HTTP (port 80)";
+            # Bước 2: Thử với giao thức HTTP
+            echo "Trying HTTP connection (80)...";
+            argocd login $ARGOCD_SERVER:80 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --plaintext && {
+              echo "Login successful via HTTP (80)";
               echo "ARGOCD_SERVER=$ARGOCD_SERVER:80" >> $GITHUB_ENV;
               ARGOCD_LOGIN_SUCCESS=true;
             } || {
-              echo "Failed to connect via HTTP (port 80)";
+              echo "Failed via HTTP on port 80";
 
-              # Thử không chỉ định cổng
-              echo "Trying connection without port specification...";
-              argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / || {
-                echo "ArgoCD login failed. Please verify server, username, and password.";
-                echo "ArgoCD Server (after format): $ARGOCD_SERVER";
-                exit 1;
+              # Bước 3: Thử các cổng thay thế phổ biến
+              echo "Trying alternative ports (8080)...";
+              argocd login $ARGOCD_SERVER:8080 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --plaintext && {
+                echo "Login successful via port 8080";
+                echo "ARGOCD_SERVER=$ARGOCD_SERVER:8080" >> $GITHUB_ENV;
+                ARGOCD_LOGIN_SUCCESS=true;
+              } || {
+                echo "Trying port 8443 with TLS...";
+                argocd login $ARGOCD_SERVER:8443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure && {
+                  echo "Login successful via port 8443";
+                  echo "ARGOCD_SERVER=$ARGOCD_SERVER:8443" >> $GITHUB_ENV;
+                  ARGOCD_LOGIN_SUCCESS=true;
+                } || {
+                  echo "All standard ports failed. Trying without port specification...";
+                  argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --plaintext || {
+                    echo "ArgoCD login failed on all attempted configurations.";
+                    echo "Server diagnostics:";
+                    ping -c 1 $ARGOCD_SERVER || echo "Server not responding to ping";
+                    exit 1;
+                  }
+                }
               }
             }
           }
