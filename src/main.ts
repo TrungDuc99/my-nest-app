@@ -45,6 +45,8 @@ async function bootstrap() {
   // Log environment info
   console.log(`Application running in ${nodeEnv} mode`);
 
+  app.setGlobalPrefix('api');
+
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
 }
