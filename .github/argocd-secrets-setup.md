@@ -74,3 +74,74 @@ Workflow bao gồm các bước kiểm tra kết nối chi tiết:
 Kết quả của các bước này sẽ giúp xác định chính xác vấn đề kết nối và đưa ra giải pháp phù hợp.
 
 **Lưu ý**: Không bao giờ lưu trữ thông tin xác thực thật trong mã nguồn.
+
+# Hướng dẫn thiết lập Kubernetes Secrets trong GitHub
+
+File này chỉ là hướng dẫn và **KHÔNG** chứa thông tin xác thực thật.
+
+## Secrets cần thiết
+
+Để CI/CD pipeline có thể triển khai trực tiếp lên Kubernetes, bạn cần thiết lập secret sau trong GitHub repository:
+
+1. **KUBE_CONFIG**:
+
+   - Giá trị: Nội dung của file kubeconfig với quyền truy cập vào Kubernetes cluster
+   - Cách lấy: Nội dung của file `~/.kube/config` trên máy đã kết nối được với cluster
+   - **QUAN TRỌNG**: Đảm bảo file này chứa đầy đủ thông tin xác thực và không bị hết hạn
+   - Đây là secret nhạy cảm, chỉ thêm vào GitHub secrets, KHÔNG lưu trong repository
+
+2. **DOCKERHUB_USERNAME**:
+
+   - Giá trị: Tên người dùng Docker Hub (thường là `ducdt1999`)
+
+3. **DOCKERHUB_TOKEN**:
+   - Giá trị: Token xác thực Docker Hub
+
+## Cách thiết lập KUBE_CONFIG
+
+### Bước 1: Lấy nội dung kubeconfig từ máy local
+
+```bash
+# Hiển thị nội dung file kubeconfig
+cat ~/.kube/config
+```
+
+### Bước 2: Kiểm tra xem kubeconfig có thông tin xác thực đầy đủ không
+
+Nội dung kubeconfig cần có:
+
+- Cluster information (server URL)
+- User authentication info (token hoặc cert)
+- Context tương ứng
+
+### Bước 3: Thêm vào GitHub Secrets
+
+1. Truy cập GitHub repository > Settings > Secrets and variables > Actions
+2. Nhấn "New repository secret"
+3. Điền:
+   - Name: `KUBE_CONFIG`
+   - Value: Dán toàn bộ nội dung file config đã sao chép
+4. Nhấn "Add secret"
+
+## Lỗi phổ biến và cách khắc phục
+
+- **"Unable to connect to the server"**: Kiểm tra thông tin server trong kubeconfig
+- **"Unauthorized"**: Token đã hết hạn, cần tạo lại kubeconfig
+- **"Error from server (Forbidden)"**: Tài khoản không có quyền thực hiện thao tác
+
+## Kiểm tra kết nối
+
+Để kiểm tra xem KUBE_CONFIG có hoạt động không trước khi thêm vào GitHub:
+
+```bash
+# Lưu vào một file tạm
+echo "nội dung config" > test_kubeconfig
+
+# Thử kết nối
+KUBECONFIG=./test_kubeconfig kubectl get nodes
+
+# Xóa file tạm khi xong
+rm test_kubeconfig
+```
+
+**Lưu ý**: Không bao giờ lưu trữ thông tin xác thực thật trong mã nguồn hoặc commit vào Git.

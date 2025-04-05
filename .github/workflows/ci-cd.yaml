@@ -98,124 +98,54 @@ jobs:
         run: |
           if [ "${{ env.BRANCH_NAME }}" = "development" ]; then
             echo "APP_NAME=nestjs-app-dev" >> $GITHUB_ENV
+            echo "NAMESPACE=nestjs-app-dev" >> $GITHUB_ENV
+            echo "TAG=dev" >> $GITHUB_ENV
           elif [ "${{ env.BRANCH_NAME }}" = "production" ]; then
             echo "APP_NAME=nestjs-app-prod" >> $GITHUB_ENV
+            echo "NAMESPACE=nestjs-app" >> $GITHUB_ENV
+            echo "TAG=prod" >> $GITHUB_ENV
           fi
-
-      - name: Install ArgoCD CLI
-        run: |
-          curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-          sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
-          rm argocd-linux-amd64
 
       - name: Debug Environment Variables
         run: |
-          echo "ARGOCD_SERVER is set: ${{ secrets.ARGOCD_SERVER != '' && 'Yes' || 'No' }}"
-          echo "ARGOCD_USERNAME is set: ${{ secrets.ARGOCD_USERNAME != '' && 'Yes' || 'No' }}"
-          echo "ARGOCD_PASSWORD is set: ${{ secrets.ARGOCD_PASSWORD != '' && 'Yes' || 'No' }}"
           echo "APP_NAME: ${{ env.APP_NAME }}"
+          echo "NAMESPACE: ${{ env.NAMESPACE }}"
           echo "BRANCH_NAME: ${{ env.BRANCH_NAME }}"
+          echo "TAG: ${{ env.TAG }}"
 
-      - name: Test ArgoCD Server Connection
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
         run: |
-          ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
-          # Xóa protocol và trailing slashes
-          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
-          echo "Testing connection to ArgoCD server: $ARGOCD_SERVER"
+          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig
+          chmod 600 kubeconfig
+          export KUBECONFIG=./kubeconfig
+          echo "Kiểm tra kết nối đến Kubernetes cluster..."
+          kubectl get nodes
 
-          # Kiểm tra kết nối đến port 443 (HTTPS) với timeout dài hơn
-          echo "Testing HTTPS connection (port 443)..."
-          nc -zv $ARGOCD_SERVER 443 -w 20 || echo "Cannot connect to port 443"
-
-          # Kiểm tra kết nối đến port 80 (HTTP) với timeout dài hơn
-          echo "Testing HTTP connection (port 80)..."
-          nc -zv $ARGOCD_SERVER 80 -w 20 || echo "Cannot connect to port 80"
-
-          # Kiểm tra kết nối đến các cổng khác mà ArgoCD có thể lắng nghe
-          echo "Testing alternative ports (8080, 8443)..."
-          nc -zv $ARGOCD_SERVER 8080 -w 15 || echo "Cannot connect to port 8080"
-          nc -zv $ARGOCD_SERVER 8443 -w 15 || echo "Cannot connect to port 8443"
-
-          # Kiểm tra ArgoCD API endpoint với các tùy chọn curl nâng cao
-          echo "Testing ArgoCD API endpoints with extended options..."
-          curl -k -v --connect-timeout 30 https://$ARGOCD_SERVER/api/version || echo "Cannot connect to HTTPS API"
-          curl -v --connect-timeout 30 http://$ARGOCD_SERVER/api/version || echo "Cannot connect to HTTP API"
-
-      - name: Verify ArgoCD Server Accessibility
+      - name: Update Deployment
         run: |
-          ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
-          # Xóa protocol và trailing slashes
-          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
+          export KUBECONFIG=./kubeconfig
 
-          # Thử ping đến server để kiểm tra kết nối mạng cơ bản
-          echo "Ping test to ArgoCD server..."
-          ping -c 3 $ARGOCD_SERVER || echo "Ping failed but might be blocked by firewall"
+          echo "Checking if namespace exists..."
+          kubectl get namespace ${{ env.NAMESPACE }} || kubectl create namespace ${{ env.NAMESPACE }}
 
-          # Kiểm tra thông tin về tuyến đường mạng
-          echo "Network route information..."
-          traceroute $ARGOCD_SERVER || echo "Traceroute failed or not available"
+          echo "Checking if deployment exists..."
+          if kubectl get deployment nestjs-app -n ${{ env.NAMESPACE }} 2>/dev/null; then
+            echo "Updating existing deployment..."
+            kubectl set image deployment/nestjs-app nestjs-app=ducdt1999/nestjs-app:${{ env.TAG }} -n ${{ env.NAMESPACE }}
+          else
+            echo "Creating new deployment from manifest..."
+            # Áp dụng file deployment từ repository với kustomize
+            kubectl apply -k kubernetes/overlays/${{ env.BRANCH_NAME }} -n ${{ env.NAMESPACE }}
+          fi
 
-          # Hiển thị thông tin DNS
-          echo "DNS lookup information..."
-          nslookup $ARGOCD_SERVER || echo "DNS lookup failed"
+          echo "Checking deployment rollout status..."
+          kubectl rollout status deployment/nestjs-app -n ${{ env.NAMESPACE }} --timeout=120s
 
-      - name: Login to ArgoCD
-        run: |
-          # Đảm bảo định dạng địa chỉ server là chính xác
-          ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
-          # Xóa protocol và trailing slashes
-          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
-
-          echo "Connecting to ArgoCD server: $ARGOCD_SERVER"
-
-          # Bước 1: Thử kết nối HTTPS với plaintext và insecure
-          echo "Trying HTTPS connection (443) with plaintext and insecure flags..."
-          argocd login $ARGOCD_SERVER:443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --plaintext && {
-            echo "Login successful via HTTPS (443) with plaintext";
-            echo "ARGOCD_SERVER=$ARGOCD_SERVER:443" >> $GITHUB_ENV;
-            ARGOCD_LOGIN_SUCCESS=true;
-          } || {
-            echo "Failed with plaintext and insecure flags";
-
-            # Bước 2: Thử với giao thức HTTP
-            echo "Trying HTTP connection (80)...";
-            argocd login $ARGOCD_SERVER:80 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --plaintext && {
-              echo "Login successful via HTTP (80)";
-              echo "ARGOCD_SERVER=$ARGOCD_SERVER:80" >> $GITHUB_ENV;
-              ARGOCD_LOGIN_SUCCESS=true;
-            } || {
-              echo "Failed via HTTP on port 80";
-
-              # Bước 3: Thử các cổng thay thế phổ biến
-              echo "Trying alternative ports (8080)...";
-              argocd login $ARGOCD_SERVER:8080 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --plaintext && {
-                echo "Login successful via port 8080";
-                echo "ARGOCD_SERVER=$ARGOCD_SERVER:8080" >> $GITHUB_ENV;
-                ARGOCD_LOGIN_SUCCESS=true;
-              } || {
-                echo "Trying port 8443 with TLS...";
-                argocd login $ARGOCD_SERVER:8443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure && {
-                  echo "Login successful via port 8443";
-                  echo "ARGOCD_SERVER=$ARGOCD_SERVER:8443" >> $GITHUB_ENV;
-                  ARGOCD_LOGIN_SUCCESS=true;
-                } || {
-                  echo "All standard ports failed. Trying without port specification...";
-                  argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --plaintext || {
-                    echo "ArgoCD login failed on all attempted configurations.";
-                    echo "Server diagnostics:";
-                    ping -c 1 $ARGOCD_SERVER || echo "Server not responding to ping";
-                    exit 1;
-                  }
-                }
-              }
-            }
-          }
-
-      - name: Sync ArgoCD Application
-        run: |
-          argocd app sync ${{ env.APP_NAME }} --prune || {
-            echo "Failed to sync application: ${{ env.APP_NAME }}";
-            echo "Checking application status:";
-            argocd app get ${{ env.APP_NAME }};
-            exit 1;
-          }
+          echo "Deployment information:"
+          kubectl get deployment nestjs-app -n ${{ env.NAMESPACE }} -o wide
+          kubectl get pods -n ${{ env.NAMESPACE }} -l app=nestjs-app
