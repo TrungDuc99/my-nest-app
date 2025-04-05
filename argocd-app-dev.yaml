@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nestjs-app-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ducdt1999/my-nestjs-app.git
+    targetRevision: master
+    path: kubernetes/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nestjs-app-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
