@@ -118,9 +118,17 @@ jobs:
 
       - name: Login to ArgoCD
         run: |
-          argocd login ${{ secrets.ARGOCD_SERVER }} --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure || {
+          # Đảm bảo định dạng địa chỉ server là chính xác (chỉ hostname hoặc IP, không có schema http(s)://)
+          ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
+          # Xóa protocol (http/https) nếu có
+          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//')
+          # Xóa dấu gạch chéo ở cuối nếu có
+          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed 's/\/$//')
+          echo "Connecting to ArgoCD server: $ARGOCD_SERVER"
+
+          argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure || {
             echo "ArgoCD login failed. Please verify server, username, and password.";
-            echo "ArgoCD Server: ${{ secrets.ARGOCD_SERVER }}";
+            echo "ArgoCD Server (after format): $ARGOCD_SERVER";
             exit 1;
           }
 
