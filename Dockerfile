@@ -14,8 +14,8 @@ RUN npm ci --loglevel verbose || npm install --legacy-peer-deps --loglevel verbo
 # Copy the rest of the code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application using npx to find the local nest binary
+RUN npx nest build
 
 # Stage 2: Run app
 FROM node:18-alpine
