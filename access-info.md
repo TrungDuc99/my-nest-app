@@ -2,32 +2,51 @@
 
 File này tổng hợp tất cả các thông tin truy cập quan trọng cho hệ thống NestJS và các công cụ CI/CD.
 
-## Argo CD
+## Thông tin truy cập API và dịch vụ
 
-| Thông tin    | Giá trị                                                           |
-| ------------ | ----------------------------------------------------------------- |
-| URL truy cập | https://146.190.4.238 hoặc https://[2400:6180:0:d2:0:1:bb07:8000] |
-| URL Local    | https://localhost:8080 (qua port-forward)                         |
-| Username     | admin                                                             |
-| Password     | EZx84T5ly-uMfeVb                                                  |
-| Port-forward | `kubectl port-forward svc/argocd-server -n argocd 8080:443`       |
-| Namespace    | argocd                                                            |
+### Argo CD
 
-### Lệnh hữu ích cho Argo CD
+- **URL:** https://146.190.4.238 hoặc https://[2400:6180:0:d2:0:1:bb07:8000]
+- **URL Dự phòng:** https://localhost:8080 (qua port-forward)
+- **Tài khoản:** admin
+- **Mật khẩu:** EZx84T5ly-uMfeVb
+
+### NestJS API
+
+- **HTTP URL:** http://157.230.194.205
+- **Tên miền mặc định:** http://nestjs.157.230.194.205.nip.io
+- **Tên miền đề xuất:** http://nestjs.188.166.196.28.nip.io (trỏ đến Ingress Controller)
+- **HTTPS URL khi chứng chỉ đã sẵn sàng:** https://nestjs.188.166.196.28.nip.io
+
+### Lưu ý về HTTPS
+
+Hiện tại, trạng thái chứng chỉ SSL vẫn đang chờ Let's Encrypt xác thực. Để tạm thời truy cập qua HTTPS, bạn có thể:
+
+1. **Thêm vào file hosts:** Thêm dòng sau vào file `/etc/hosts` (Linux/macOS) hoặc `C:\Windows\System32\drivers\etc\hosts` (Windows):
+
+   ```
+   188.166.196.28 nestjs.188.166.196.28.nip.io
+   ```
+
+2. **Sử dụng curl với tùy chọn resolve:**
+   ```
+   curl -k --resolve nestjs.188.166.196.28.nip.io:443:188.166.196.28 https://nestjs.188.166.196.28.nip.io
+   ```
+
+### Lệnh hữu ích
 
 ```bash
-# Đăng nhập Argo CD CLI
-argocd login 146.190.4.238 --username admin --password EZx84T5ly-uMfeVb --insecure
+# Kiểm tra trạng thái chứng chỉ
+kubectl get certificate -n nestjs-app
 
-# Xem danh sách ứng dụng
-kubectl get applications -n argocd
+# Xem chi tiết của Ingress
+kubectl describe ingress -n nestjs-app
 
-# Xem chi tiết ứng dụng
-kubectl describe application nestjs-app-dev -n argocd
-kubectl describe application nestjs-app-prod -n argocd
+# Kiểm tra pod của ứng dụng
+kubectl get pods -n nestjs-app
 
-# Khởi động lại Argo CD repo server (nếu cần)
-kubectl rollout restart deployment argocd-repo-server -n argocd
+# Forward cổng nếu không thể truy cập trực tiếp
+kubectl port-forward svc/nestjs-app 3000:80 -n nestjs-app
 ```
 
 ## Ứng dụng NestJS
@@ -60,14 +79,6 @@ kubectl get svc -n nestjs-app
 | ------------ | ---------------------------------------------- |
 | API Root     | https://nestjs.157.230.194.205.nip.io/api      |
 | Swagger Docs | https://nestjs.157.230.194.205.nip.io/api-docs |
-
-### Truy cập HTTPS
-
-Ứng dụng đã được cấu hình để tự động chuyển hướng từ HTTP sang HTTPS. Việc này được triển khai thông qua:
-
-- Cert-manager để tự động lấy và quản lý chứng chỉ Let's Encrypt
-- Nginx Ingress để điều hướng traffic và tự động chuyển hướng sang HTTPS
-- Domain sử dụng service nip.io để trỏ đến IP máy chủ, không cần đăng ký domain riêng
 
 ## Cụm Kubernetes DigitalOcean
 

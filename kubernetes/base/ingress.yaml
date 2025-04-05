@@ -6,15 +6,36 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   tls:
     - hosts:
         - nestjs.157.230.194.205.nip.io
+        - nestjs.188.166.196.28.nip.io
       secretName: nestjs-app-tls
   rules:
     - host: nestjs.157.230.194.205.nip.io
       http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nestjs-app
+                port:
+                  number: 80
+    - host: nestjs.188.166.196.28.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nestjs-app
+                port:
+                  number: 80
+    - http:
         paths:
           - path: /
             pathType: Prefix
