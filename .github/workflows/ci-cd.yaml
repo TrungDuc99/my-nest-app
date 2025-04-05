@@ -125,40 +125,67 @@ jobs:
           echo "Current HOME directory: $HOME"
           ls -la ~/.kube || echo "No .kube directory"
 
+      - name: Check KUBE_CONFIG secret
+        run: |
+          # Kiểm tra xem secret KUBE_CONFIG có tồn tại không
+          if [ -z "${{ secrets.KUBE_CONFIG }}" ]; then
+            echo "ERROR: KUBE_CONFIG secret is empty or not set!"
+            exit 1
+          fi
+
+          # Kiểm tra độ dài của secret
+          CONFIG_LENGTH=$(echo "${{ secrets.KUBE_CONFIG }}" | wc -c)
+          echo "KUBE_CONFIG length: $CONFIG_LENGTH characters"
+
+          # Kiểm tra nếu config có chứa các thành phần cần thiết (không hiển thị toàn bộ nội dung)
+          echo "Checking for essential components in KUBE_CONFIG:"
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "apiVersion:" && echo "- apiVersion: Found" || echo "- apiVersion: MISSING!"
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "clusters:" && echo "- clusters: Found" || echo "- clusters: MISSING!"
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "users:" && echo "- users: Found" || echo "- users: MISSING!"
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "contexts:" && echo "- contexts: Found" || echo "- contexts: MISSING!"
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "current-context:" && echo "- current-context: Found" || echo "- current-context: MISSING!"
+
+          # Kiểm tra nếu có token hoặc cert (không hiển thị giá trị cụ thể)
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "token:" && echo "- Authentication token: Found" || echo "- Authentication token: MISSING!"
+          echo "${{ secrets.KUBE_CONFIG }}" | grep -q "certificate-authority-data:" && echo "- CA data: Found" || echo "- CA data: Not found (but might not be required)"
+
       - name: Configure kubectl
         run: |
-          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig
-          chmod 600 kubeconfig
-          # Thiết lập KUBECONFIG cho GitHub Actions environment
-          echo "KUBECONFIG=$PWD/kubeconfig" >> $GITHUB_ENV
+          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
+          chmod 600 kubeconfig.yaml
+          # Kiểm tra nội dung kubeconfig để đảm bảo hợp lệ
+          echo "Kiểm tra nội dung kubeconfig..."
+          grep "server:" kubeconfig.yaml || echo "Không tìm thấy thông tin server trong kubeconfig"
+          echo "Kiểm tra thông tin xác thực..."
+          grep "token:" kubeconfig.yaml || echo "Không tìm thấy token trong kubeconfig"
           echo "Kiểm tra kết nối đến Kubernetes cluster..."
-          kubectl get nodes
+          kubectl --kubeconfig=kubeconfig.yaml get nodes
 
       - name: Debug Kubernetes Configuration After
         run: |
-          echo "Current KUBECONFIG: $KUBECONFIG"
-          echo "GITHUB_ENV KUBECONFIG: $(grep KUBECONFIG $GITHUB_ENV || echo 'Not found')"
-          kubectl config view || echo "No kubectl config found"
-          kubectl config current-context || echo "No current context set"
+          echo "Kiểm tra cấu hình kubectl với kubeconfig mới..."
+          kubectl --kubeconfig=kubeconfig.yaml config view
+          kubectl --kubeconfig=kubeconfig.yaml config current-context
+          kubectl --kubeconfig=kubeconfig.yaml cluster-info
 
       - name: Update Deployment
         run: |
           echo "Checking if namespace exists..."
-          kubectl get namespace ${{ env.NAMESPACE }} || kubectl create namespace ${{ env.NAMESPACE }}
+          kubectl --kubeconfig=kubeconfig.yaml get namespace ${{ env.NAMESPACE }} || kubectl --kubeconfig=kubeconfig.yaml create namespace ${{ env.NAMESPACE }}
 
           echo "Checking if deployment exists..."
-          if kubectl get deployment nestjs-app -n ${{ env.NAMESPACE }} 2>/dev/null; then
+          if kubectl --kubeconfig=kubeconfig.yaml get deployment nestjs-app -n ${{ env.NAMESPACE }} 2>/dev/null; then
             echo "Updating existing deployment..."
-            kubectl set image deployment/nestjs-app nestjs-app=ducdt1999/nestjs-app:${{ env.TAG }} -n ${{ env.NAMESPACE }}
+            kubectl --kubeconfig=kubeconfig.yaml set image deployment/nestjs-app nestjs-app=ducdt1999/nestjs-app:${{ env.TAG }} -n ${{ env.NAMESPACE }}
           else
             echo "Creating new deployment from manifest..."
             # Áp dụng file deployment từ repository với kustomize
-            kubectl apply -k kubernetes/overlays/${{ env.BRANCH_NAME }} -n ${{ env.NAMESPACE }}
+            kubectl --kubeconfig=kubeconfig.yaml apply -k kubernetes/overlays/${{ env.BRANCH_NAME }} -n ${{ env.NAMESPACE }}
           fi
 
           echo "Checking deployment rollout status..."
-          kubectl rollout status deployment/nestjs-app -n ${{ env.NAMESPACE }} --timeout=120s
+          kubectl --kubeconfig=kubeconfig.yaml rollout status deployment/nestjs-app -n ${{ env.NAMESPACE }} --timeout=120s
 
           echo "Deployment information:"
-          kubectl get deployment nestjs-app -n ${{ env.NAMESPACE }} -o wide
-          kubectl get pods -n ${{ env.NAMESPACE }} -l app=nestjs-app
+          kubectl --kubeconfig=kubeconfig.yaml get deployment nestjs-app -n ${{ env.NAMESPACE }} -o wide
+          kubectl --kubeconfig=kubeconfig.yaml get pods -n ${{ env.NAMESPACE }} -l app=nestjs-app
