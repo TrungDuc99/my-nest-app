@@ -32,10 +32,11 @@ kubectl rollout restart deployment argocd-repo-server -n argocd
 
 ## Ứng dụng NestJS
 
-| Môi trường | Namespace      | URL                                               |
-| ---------- | -------------- | ------------------------------------------------- |
-| Dev        | nestjs-app-dev | Sử dụng lệnh: `kubectl get svc -n nestjs-app-dev` |
-| Production | nestjs-app     | Sử dụng lệnh: `kubectl get svc -n nestjs-app`     |
+| Môi trường         | Namespace      | URL                                               |
+| ------------------ | -------------- | ------------------------------------------------- |
+| Dev                | nestjs-app-dev | Sử dụng lệnh: `kubectl get svc -n nestjs-app-dev` |
+| Production         | nestjs-app     | http://157.230.194.205                            |
+| Production (HTTPS) | nestjs-app     | https://nestjs.157.230.194.205.nip.io             |
 
 ### Lệnh hữu ích cho ứng dụng NestJS
 
@@ -52,6 +53,21 @@ kubectl logs -n nestjs-app <pod-name>
 # Xem service và IP truy cập
 kubectl get svc -n nestjs-app
 ```
+
+### Endpoint API
+
+| Tên          | URL                                            |
+| ------------ | ---------------------------------------------- |
+| API Root     | https://nestjs.157.230.194.205.nip.io/api      |
+| Swagger Docs | https://nestjs.157.230.194.205.nip.io/api-docs |
+
+### Truy cập HTTPS
+
+Ứng dụng đã được cấu hình để tự động chuyển hướng từ HTTP sang HTTPS. Việc này được triển khai thông qua:
+
+- Cert-manager để tự động lấy và quản lý chứng chỉ Let's Encrypt
+- Nginx Ingress để điều hướng traffic và tự động chuyển hướng sang HTTPS
+- Domain sử dụng service nip.io để trỏ đến IP máy chủ, không cần đăng ký domain riêng
 
 ## Cụm Kubernetes DigitalOcean
 
@@ -74,6 +90,7 @@ kubectl get svc -n nestjs-app
 - `DOCKER_USERNAME`: Tên đăng nhập Docker Hub
 - `DOCKER_PASSWORD`: Mật khẩu Docker Hub
 - `GH_PAT`: GitHub Personal Access Token cho việc cập nhật file cấu hình
+- `KUBE_CONFIG`: Cấu hình kubectl để đẩy code lên Kubernetes cluster
 
 ## Docker Hub
 
