@@ -108,10 +108,27 @@ jobs:
           sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
           rm argocd-linux-amd64
 
+      - name: Debug Environment Variables
+        run: |
+          echo "ARGOCD_SERVER is set: ${{ secrets.ARGOCD_SERVER != '' && 'Yes' || 'No' }}"
+          echo "ARGOCD_USERNAME is set: ${{ secrets.ARGOCD_USERNAME != '' && 'Yes' || 'No' }}"
+          echo "ARGOCD_PASSWORD is set: ${{ secrets.ARGOCD_PASSWORD != '' && 'Yes' || 'No' }}"
+          echo "APP_NAME: ${{ env.APP_NAME }}"
+          echo "BRANCH_NAME: ${{ env.BRANCH_NAME }}"
+
       - name: Login to ArgoCD
         run: |
-          argocd login ${{ secrets.ARGOCD_SERVER }} --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure
+          argocd login ${{ secrets.ARGOCD_SERVER }} --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure || {
+            echo "ArgoCD login failed. Please verify server, username, and password.";
+            echo "ArgoCD Server: ${{ secrets.ARGOCD_SERVER }}";
+            exit 1;
+          }
 
       - name: Sync ArgoCD Application
         run: |
-          argocd app sync ${{ env.APP_NAME }} --prune
+          argocd app sync ${{ env.APP_NAME }} --prune || {
+            echo "Failed to sync application: ${{ env.APP_NAME }}";
+            echo "Checking application status:";
+            argocd app get ${{ env.APP_NAME }};
+            exit 1;
+          }
