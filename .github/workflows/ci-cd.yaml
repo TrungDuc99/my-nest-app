@@ -116,25 +116,66 @@ jobs:
           echo "APP_NAME: ${{ env.APP_NAME }}"
           echo "BRANCH_NAME: ${{ env.BRANCH_NAME }}"
 
+      - name: Test ArgoCD Server Connection
+        run: |
+          ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
+          # Xóa protocol và trailing slashes
+          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
+          echo "Testing connection to ArgoCD server: $ARGOCD_SERVER"
+
+          # Kiểm tra kết nối đến port 443 (HTTPS)
+          echo "Testing HTTPS connection (port 443)..."
+          nc -zv $ARGOCD_SERVER 443 -w 10 || echo "Cannot connect to port 443"
+
+          # Kiểm tra kết nối đến port 80 (HTTP)
+          echo "Testing HTTP connection (port 80)..."
+          nc -zv $ARGOCD_SERVER 80 -w 10 || echo "Cannot connect to port 80"
+
+          # Kiểm tra ArgoCD API endpoint trên cả hai cổng
+          echo "Testing ArgoCD API endpoints..."
+          curl -k https://$ARGOCD_SERVER/api/version -m 10 || echo "Cannot connect to HTTPS API"
+          curl http://$ARGOCD_SERVER/api/version -m 10 || echo "Cannot connect to HTTP API"
+
       - name: Login to ArgoCD
         run: |
-          # Đảm bảo định dạng địa chỉ server là chính xác (chỉ hostname hoặc IP, không có schema http(s)://)
+          # Đảm bảo định dạng địa chỉ server là chính xác
           ARGOCD_SERVER="${{ secrets.ARGOCD_SERVER }}"
-          # Xóa protocol (http/https) nếu có
-          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//')
-          # Xóa dấu gạch chéo ở cuối nếu có
-          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed 's/\/$//')
+          # Xóa protocol và trailing slashes
+          ARGOCD_SERVER=$(echo $ARGOCD_SERVER | sed -E 's/^(https?:\/\/|\/\/)//' | sed 's/\/$//')
+
           echo "Connecting to ArgoCD server: $ARGOCD_SERVER"
 
-          argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure || {
-            echo "ArgoCD login failed. Please verify server, username, and password.";
-            echo "ArgoCD Server (after format): $ARGOCD_SERVER";
-            exit 1;
+          # Thêm port 443 (HTTPS) và tăng timeout
+          echo "Trying HTTPS connection with port 443..."
+          argocd login $ARGOCD_SERVER:443 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / --timeout 60 && {
+            echo "Login successful via HTTPS (port 443)";
+            echo "ARGOCD_SERVER=$ARGOCD_SERVER:443" >> $GITHUB_ENV;
+            ARGOCD_LOGIN_SUCCESS=true;
+          } || {
+            echo "Failed to connect via HTTPS (port 443)";
+
+            # Thử kết nối với port 80 (HTTP)
+            echo "Trying HTTP connection with port 80...";
+            argocd login $ARGOCD_SERVER:80 --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / --timeout 60 && {
+              echo "Login successful via HTTP (port 80)";
+              echo "ARGOCD_SERVER=$ARGOCD_SERVER:80" >> $GITHUB_ENV;
+              ARGOCD_LOGIN_SUCCESS=true;
+            } || {
+              echo "Failed to connect via HTTP (port 80)";
+
+              # Thử không chỉ định cổng
+              echo "Trying connection without port specification...";
+              argocd login $ARGOCD_SERVER --username ${{ secrets.ARGOCD_USERNAME }} --password ${{ secrets.ARGOCD_PASSWORD }} --insecure --grpc-web-root-path / --timeout 60 || {
+                echo "ArgoCD login failed. Please verify server, username, and password.";
+                echo "ArgoCD Server (after format): $ARGOCD_SERVER";
+                exit 1;
+              }
+            }
           }
 
       - name: Sync ArgoCD Application
         run: |
-          argocd app sync ${{ env.APP_NAME }} --prune || {
+          argocd app sync ${{ env.APP_NAME }} --prune --timeout 120 || {
             echo "Failed to sync application: ${{ env.APP_NAME }}";
             echo "Checking application status:";
             argocd app get ${{ env.APP_NAME }};
