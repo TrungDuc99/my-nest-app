@@ -118,18 +118,31 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Debug Kubernetes Configuration Before
+        run: |
+          echo "Current KUBECONFIG: $KUBECONFIG"
+          kubectl config view || echo "No kubectl config found"
+          echo "Current HOME directory: $HOME"
+          ls -la ~/.kube || echo "No .kube directory"
+
       - name: Configure kubectl
         run: |
           echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig
           chmod 600 kubeconfig
-          export KUBECONFIG=./kubeconfig
+          # Thiết lập KUBECONFIG cho GitHub Actions environment
+          echo "KUBECONFIG=$PWD/kubeconfig" >> $GITHUB_ENV
           echo "Kiểm tra kết nối đến Kubernetes cluster..."
           kubectl get nodes
 
+      - name: Debug Kubernetes Configuration After
+        run: |
+          echo "Current KUBECONFIG: $KUBECONFIG"
+          echo "GITHUB_ENV KUBECONFIG: $(grep KUBECONFIG $GITHUB_ENV || echo 'Not found')"
+          kubectl config view || echo "No kubectl config found"
+          kubectl config current-context || echo "No current context set"
+
       - name: Update Deployment
         run: |
-          export KUBECONFIG=./kubeconfig
-
           echo "Checking if namespace exists..."
           kubectl get namespace ${{ env.NAMESPACE }} || kubectl create namespace ${{ env.NAMESPACE }}
 
