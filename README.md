@@ -22,6 +22,92 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+# NestJS Application with Kubernetes and Argo CD
+
+Ứng dụng NestJS được triển khai trên Kubernetes với CI/CD sử dụng GitHub Actions và Argo CD.
+
+## Tổng Quan
+
+Đây là một ứng dụng NestJS được containerized bằng Docker và triển khai trên cụm Kubernetes DigitalOcean sử dụng quy trình CI/CD tự động hoá.
+
+### Công Nghệ Sử Dụng
+
+- **Backend**: NestJS
+- **Container**: Docker (với multi-stage builds)
+- **Orchestration**: Kubernetes
+- **CI/CD**: GitHub Actions + Argo CD
+- **Registry**: Docker Hub
+
+## Tài Liệu
+
+Xem [Chỉ Mục Tài Liệu](./documentation-index.md) để truy cập tất cả các hướng dẫn và tài liệu có trong dự án.
+
+### Truy Cập Nhanh
+
+- [Thông Tin Truy Cập](./access-info.md) - Thông tin về URL, port, tài khoản, v.v.
+- [Hướng Dẫn Triển Khai](./deployment-guide.md) - Hướng dẫn triển khai ứng dụng lên Kubernetes
+- [Hướng Dẫn CI/CD](./cicd-argocd-guide.md) - Hướng dẫn thiết lập CI/CD với Argo CD
+- [Hướng Dẫn Xử Lý Sự Cố](./troubleshooting-guide.md) - Hướng dẫn xử lý các vấn đề thường gặp
+- [Hướng Dẫn Sử Dụng Kubectl](./kubectl-commands.md) - Tổng hợp các lệnh kubectl quản lý hệ thống
+
+## Cấu Trúc Dự Án
+
+```
+my-nest-app/
+├── src/                  # Mã nguồn NestJS
+├── kubernetes/           # Manifest Kubernetes
+│   ├── base/             # Cấu hình cơ bản
+│   └── overlays/         # Cấu hình cho từng môi trường
+│       ├── dev/
+│       └── prod/
+├── .github/workflows/    # CI/CD workflow
+├── Dockerfile            # Dockerfile gốc
+├── Dockerfile.simple     # Dockerfile đơn giản hóa
+└── documentation/        # Tài liệu hướng dẫn
+```
+
+## Quy Trình CI/CD
+
+1. Developer push code lên nhánh master
+2. GitHub Actions tự động:
+   - Build và test code
+   - Build Docker image và push lên Docker Hub
+   - Cập nhật tag image trong manifest Kubernetes
+3. Argo CD phát hiện thay đổi trong manifest Kubernetes
+4. Argo CD tự động triển khai phiên bản mới lên cụm Kubernetes
+
+## Môi Trường
+
+- **Development**: namespace `nestjs-app-dev`
+- **Production**: namespace `nestjs-app`
+
+## Lệnh Hữu Ích
+
+Kiểm tra trạng thái ứng dụng:
+
+```bash
+kubectl get all -n nestjs-app
+kubectl get all -n nestjs-app-dev
+```
+
+Xem logs của ứng dụng:
+
+```bash
+kubectl logs -f -n nestjs-app <pod-name>
+```
+
+Truy cập Argo CD UI:
+
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Sau đó mở trình duyệt và truy cập https://localhost:8080
+
+## Liên Hệ
+
+Nếu có câu hỏi hoặc gặp vấn đề, vui lòng tạo issue hoặc liên hệ trực tiếp với team phát triển.
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.

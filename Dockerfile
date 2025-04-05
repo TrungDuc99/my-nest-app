@@ -7,9 +7,15 @@ ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PATH:$PNPM_HOME
 ENV CI=true
 
+# Build arguments
+ARG NODE_ENV=production
+
 # Copy source code và install packages
 COPY . .
-RUN npm install -g pnpm && pnpm config set auto-install-peers true && pnpm install --frozen-lockfile && pnpm build
+RUN npm install -g pnpm && \
+  pnpm config set auto-install-peers true && \
+  pnpm install --frozen-lockfile && \
+  pnpm build
 
 # Stage 2: Run app
 FROM --platform=linux/amd64 node:18-alpine
@@ -20,10 +26,18 @@ ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=$PATH:$PNPM_HOME
 ENV CI=true
 
+# Environment variables
+ENV NODE_ENV=production
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./
+COPY --from=builder /app/environments ./environments
 
-RUN npm install -g pnpm && pnpm config set auto-install-peers true && pnpm install --prod --frozen-lockfile
+RUN npm install -g pnpm && \
+  pnpm config set auto-install-peers true && \
+  pnpm install --prod --frozen-lockfile
+
+EXPOSE 3000
 
 CMD ["node", "dist/main.js"]
