@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: nestjs-app-quota
+  namespace: nestjs-app
+spec:
+  hard:
+    requests.cpu: "50m"
+    requests.memory: "64Mi"
+    limits.cpu: "100m"
+    limits.memory: "128Mi"

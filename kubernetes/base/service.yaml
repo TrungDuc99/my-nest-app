@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nestjs-app
+  labels:
+    app: nestjs-app
+spec:
+  selector:
+    app: nestjs-app
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+  type: LoadBalancer
