@@ -7,17 +7,13 @@ File này tổng hợp tất cả các thông tin truy cập quan trọng cho h�
 ### Argo CD
 
 - **URL chính:** https://argocd.tradeland.online
-- **URL cũ:** https://146.190.4.238 hoặc https://[2400:6180:0:d2:0:1:bb07:8000]
-- **URL Dự phòng:** https://localhost:8080 (qua port-forward)
+- **URL dự phòng:** https://localhost:8080 (qua port-forward)
 - **Tài khoản:** admin
 - **Mật khẩu:** EZx84T5ly-uMfeVb
 
 ### NestJS API
 
 - **URL chính:** https://api.tradeland.online
-- **HTTP URL cũ:** http://157.230.194.205
-- **Tên miền cũ 1:** http://nestjs.157.230.194.205.nip.io
-- **Tên miền cũ 2:** http://nestjs.188.166.196.28.nip.io (trỏ đến Ingress Controller)
 
 ### Hướng dẫn cấu hình DNS
 
@@ -52,11 +48,10 @@ kubectl port-forward svc/nestjs-app 3000:80 -n nestjs-app
 
 ## Ứng dụng NestJS
 
-| Môi trường      | Namespace      | URL                                               |
-| --------------- | -------------- | ------------------------------------------------- |
-| Dev             | nestjs-app-dev | Sử dụng lệnh: `kubectl get svc -n nestjs-app-dev` |
-| Production      | nestjs-app     | https://api.tradeland.online                      |
-| Production (cũ) | nestjs-app     | http://157.230.194.205                            |
+| Môi trường | Namespace      | URL                                               |
+| ---------- | -------------- | ------------------------------------------------- |
+| Dev        | nestjs-app-dev | Sử dụng lệnh: `kubectl get svc -n nestjs-app-dev` |
+| Production | nestjs-app     | https://api.tradeland.online                      |
 
 ### Lệnh hữu ích cho ứng dụng NestJS
 
