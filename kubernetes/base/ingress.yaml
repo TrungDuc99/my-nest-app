@@ -13,6 +13,7 @@ spec:
     - hosts:
         - nestjs.157.230.194.205.nip.io
         - nestjs.188.166.196.28.nip.io
+        - api.tradeland.online
       secretName: nestjs-app-tls
   rules:
     - host: nestjs.157.230.194.205.nip.io
@@ -26,6 +27,16 @@ spec:
                 port:
                   number: 80
     - host: nestjs.188.166.196.28.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nestjs-app
+                port:
+                  number: 80
+    - host: api.tradeland.online
       http:
         paths:
           - path: /

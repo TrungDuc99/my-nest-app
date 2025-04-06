@@ -6,32 +6,33 @@ File này tổng hợp tất cả các thông tin truy cập quan trọng cho h�
 
 ### Argo CD
 
-- **URL:** https://146.190.4.238 hoặc https://[2400:6180:0:d2:0:1:bb07:8000]
+- **URL chính:** https://argocd.tradeland.online
+- **URL cũ:** https://146.190.4.238 hoặc https://[2400:6180:0:d2:0:1:bb07:8000]
 - **URL Dự phòng:** https://localhost:8080 (qua port-forward)
 - **Tài khoản:** admin
 - **Mật khẩu:** EZx84T5ly-uMfeVb
 
 ### NestJS API
 
-- **HTTP URL:** http://157.230.194.205
-- **Tên miền mặc định:** http://nestjs.157.230.194.205.nip.io
-- **Tên miền đề xuất:** http://nestjs.188.166.196.28.nip.io (trỏ đến Ingress Controller)
-- **HTTPS URL khi chứng chỉ đã sẵn sàng:** https://nestjs.188.166.196.28.nip.io
+- **URL chính:** https://api.tradeland.online
+- **HTTP URL cũ:** http://157.230.194.205
+- **Tên miền cũ 1:** http://nestjs.157.230.194.205.nip.io
+- **Tên miền cũ 2:** http://nestjs.188.166.196.28.nip.io (trỏ đến Ingress Controller)
+
+### Hướng dẫn cấu hình DNS
+
+Để sử dụng các tên miền chính thức, hãy cấu hình DNS như sau:
+
+1. **Tên miền API**:
+
+   - `api.tradeland.online` trỏ đến IP **188.166.196.28** (IP của Ingress Controller)
+
+2. **Tên miền ArgoCD**:
+   - `argocd.tradeland.online` trỏ đến IP **146.190.4.238** (IP của LoadBalancer ArgoCD)
 
 ### Lưu ý về HTTPS
 
-Hiện tại, trạng thái chứng chỉ SSL vẫn đang chờ Let's Encrypt xác thực. Để tạm thời truy cập qua HTTPS, bạn có thể:
-
-1. **Thêm vào file hosts:** Thêm dòng sau vào file `/etc/hosts` (Linux/macOS) hoặc `C:\Windows\System32\drivers\etc\hosts` (Windows):
-
-   ```
-   188.166.196.28 nestjs.188.166.196.28.nip.io
-   ```
-
-2. **Sử dụng curl với tùy chọn resolve:**
-   ```
-   curl -k --resolve nestjs.188.166.196.28.nip.io:443:188.166.196.28 https://nestjs.188.166.196.28.nip.io
-   ```
+Sau khi cấu hình DNS xong, chứng chỉ SSL sẽ được tự động yêu cầu và cài đặt bởi Let's Encrypt. Điều này có thể mất vài phút đến vài giờ để hoàn tất.
 
 ### Lệnh hữu ích
 
@@ -51,11 +52,11 @@ kubectl port-forward svc/nestjs-app 3000:80 -n nestjs-app
 
 ## Ứng dụng NestJS
 
-| Môi trường         | Namespace      | URL                                               |
-| ------------------ | -------------- | ------------------------------------------------- |
-| Dev                | nestjs-app-dev | Sử dụng lệnh: `kubectl get svc -n nestjs-app-dev` |
-| Production         | nestjs-app     | http://157.230.194.205                            |
-| Production (HTTPS) | nestjs-app     | https://nestjs.157.230.194.205.nip.io             |
+| Môi trường      | Namespace      | URL                                               |
+| --------------- | -------------- | ------------------------------------------------- |
+| Dev             | nestjs-app-dev | Sử dụng lệnh: `kubectl get svc -n nestjs-app-dev` |
+| Production      | nestjs-app     | https://api.tradeland.online                      |
+| Production (cũ) | nestjs-app     | http://157.230.194.205                            |
 
 ### Lệnh hữu ích cho ứng dụng NestJS
 
@@ -75,10 +76,10 @@ kubectl get svc -n nestjs-app
 
 ### Endpoint API
 
-| Tên          | URL                                            |
-| ------------ | ---------------------------------------------- |
-| API Root     | https://nestjs.157.230.194.205.nip.io/api      |
-| Swagger Docs | https://nestjs.157.230.194.205.nip.io/api-docs |
+| Tên          | URL                                   |
+| ------------ | ------------------------------------- |
+| API Root     | https://api.tradeland.online/api      |
+| Swagger Docs | https://api.tradeland.online/api-docs |
 
 ## Cụm Kubernetes DigitalOcean
 
