@@ -15,3 +15,6 @@ configMapGenerator:
     literals:
       - NODE_ENV=development
       - SWAGGER_ENABLED=true
+replicas:
+  - name: nestjs-app
+    count: 3
